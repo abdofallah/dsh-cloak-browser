@@ -225,9 +225,9 @@ window.__ModuleLoader__.load({
           send({ type: "down", ...point(event), button: button(event) });
         },
         onMouseMove: (event) => {
-          if (!pressed.current) return;
+          // Plain hover is forwarded too (throttled) so menus/tooltips react; moves never take control.
           const now = Date.now();
-          if (now - lastMove.current < 40) return;
+          if (now - lastMove.current < (pressed.current ? 40 : 100)) return;
           lastMove.current = now;
           send({ type: "move", ...point(event) });
         },
