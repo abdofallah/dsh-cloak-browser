@@ -38,7 +38,14 @@ window.__ModuleLoader__.load({
       accept: "OK",
       dismiss: "Cancel",
       lastAction: "Last action",
-      error: "Error"
+      error: "Error",
+      "dock.label": "Browser",
+      "dock.agent": "Agent is browsing",
+      "dock.human": "You are in control",
+      "dock.help": "Needs your help",
+      "dock.blank": "blank page",
+      "dock.tabs": "{n} tabs",
+      "dock.open": "Open"
     };
     const zh = {
       title: "浏览器",
@@ -68,7 +75,14 @@ window.__ModuleLoader__.load({
       accept: "确定",
       dismiss: "取消",
       lastAction: "最近操作",
-      error: "错误"
+      error: "错误",
+      "dock.label": "浏览器",
+      "dock.agent": "Agent 正在浏览",
+      "dock.human": "你正在控制",
+      "dock.help": "需要你的协助",
+      "dock.blank": "空白页",
+      "dock.tabs": "{n} 个标签页",
+      "dock.open": "打开"
     };
 
     const CSS = `
@@ -77,8 +91,9 @@ window.__ModuleLoader__.load({
 .cbx-btn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);height:26px;min-width:26px;padding:0 6px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;font:inherit;white-space:nowrap}
 .cbx-btn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .cbx-btn:disabled{opacity:.4;cursor:default;background:transparent}
-.cbx-btn.cbx-primary{background:var(--dsw-alias-brand-primary);color:#fff}
-.cbx-btn.cbx-primary:hover{filter:brightness(1.08)}
+.cbx-btn.cbx-primary{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary));color:var(--dsw-alias-label-primary-foreground,var(--dsw-alias-bg-base));font-weight:500}
+.cbx-btn.cbx-primary:hover{background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary)));color:var(--dsw-alias-label-primary-foreground,var(--dsw-alias-bg-base))}
+.cbx-btn.cbx-outline{border:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}
 .cbx-url{flex:1;min-width:0;height:26px;border-radius:6px;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);padding:0 8px;font:inherit;outline:none}
 .cbx-url:focus{border-color:var(--dsw-alias-brand-primary)}
 .cbx-tabs{display:flex;gap:2px;padding:4px 8px 0;overflow-x:auto;border-bottom:.5px solid var(--dsw-alias-border-l1)}
@@ -311,7 +326,7 @@ window.__ModuleLoader__.load({
             h("button", { className: "cbx-btn", type: "submit" }, t("go"))),
           human
             ? h("button", { className: "cbx-btn cbx-primary", onClick: () => control("return") }, t("giveBack"))
-            : h("button", { className: "cbx-btn", onClick: () => control("take") }, t("take")),
+            : h("button", { className: "cbx-btn cbx-outline", onClick: () => control("take") }, t("take")),
           h("button", { className: "cbx-btn", title: t("closeBrowser"), onClick: () => act(() => post("/close", { session: sessionId })) }, "⏻")),
         h("div", { className: "cbx-tabs" },
           ...(state.tabs ?? []).map((tb) => h("div", { key: tb.pageId, className: `cbx-tab ${tb.active ? "cbx-active" : ""}`, title: tb.url, onClick: () => input({ type: "tab", pageId: tb.pageId }) },
@@ -339,47 +354,27 @@ window.__ModuleLoader__.load({
         h(LiveView, { sessionId, state, t, setError }));
     }
 
-    function watchAgentBrowsers(ctx) {
+    /** One page-wide subscription to every open browser (key = DSH session id). */
+    function createBrowserDirectory() {
+      let browsers = [];
+      let connected = false;
+      const listeners = new Set();
+      const changeListeners = new Set();
       let source;
       let stopped = false;
       let retry;
-      let seen;
-      const helped = new Set();
-      const open = (sessionId) => {
-        try {
-          const sidebar = ctx.get("sidebarRight");
-          if (!sidebar || typeof sidebar.openTabIn !== "function") return;
-          if (typeof sidebar.tabsIn === "function" && sidebar.tabsIn(sessionId).some((tab) => tab.kind === KIND)) {
-            const existing = sidebar.tabsIn(sessionId).find((tab) => tab.kind === KIND);
-            if (typeof sidebar.isExpanded === "function" && !sidebar.isExpanded() && sidebar.mounted?.getSnapshot?.() === sessionId) sidebar.toggleExpanded?.();
-            if (existing && sidebar.mounted?.getSnapshot?.() === sessionId) sidebar.focus?.(existing.id);
-            return;
-          }
-          sidebar.openTabIn(sessionId, KIND, {});
-        } catch {}
-      };
+      const emit = () => { for (const fn of listeners) { try { fn(); } catch {} } };
       const connect = () => {
         source = new EventSource(`${BASE}/events`);
         source.onmessage = (event) => {
           let data;
           try { data = JSON.parse(event.data); } catch { return; }
-          const browsers = data.browsers ?? [];
-          if (seen === undefined) {
-            seen = new Set(browsers.map((b) => b.key));
-            for (const b of browsers) if (b.help) helped.add(b.key);
-            return;
-          }
-          for (const b of browsers) {
-            if (!seen.has(b.key)) {
-              seen.add(b.key);
-              open(b.key);
-            }
-            if (b.help && !helped.has(b.key)) {
-              helped.add(b.key);
-              open(b.key);
-            } else if (!b.help) helped.delete(b.key);
-          }
-          for (const key of [...seen]) if (!browsers.some((b) => b.key === key)) seen.delete(key);
+          const previous = browsers;
+          browsers = Array.isArray(data.browsers) ? data.browsers : [];
+          const first = !connected;
+          connected = true;
+          for (const fn of changeListeners) { try { fn(browsers, previous, first); } catch {} }
+          emit();
         };
         source.onerror = () => {
           source.close();
@@ -387,11 +382,108 @@ window.__ModuleLoader__.load({
         };
       };
       connect();
-      return () => {
-        stopped = true;
-        clearTimeout(retry);
-        source?.close();
+      return {
+        get: (key) => browsers.find((b) => b.key === key),
+        list: () => browsers,
+        subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+        onChange(fn) { changeListeners.add(fn); return () => changeListeners.delete(fn); },
+        dispose() {
+          stopped = true;
+          clearTimeout(retry);
+          source?.close();
+          listeners.clear();
+          changeListeners.clear();
+        }
       };
+    }
+
+    /** Reveal (or create) this session's Browser tab in the right sidebar. */
+    function revealBrowserTab(ctx, sessionId) {
+      try {
+        const sidebar = ctx.get("sidebarRight");
+        if (!sidebar) return false;
+        const onScreen = sidebar.mounted?.getSnapshot?.();
+        const tabs = typeof sidebar.tabsIn === "function" ? sidebar.tabsIn(sessionId) : [];
+        const existing = tabs.find((tab) => tab.kind === KIND);
+        if (existing === undefined) {
+          if (onScreen === sessionId && typeof sidebar.openTab === "function") sidebar.openTab(KIND, {});
+          else if (typeof sidebar.openTabIn === "function") sidebar.openTabIn(sessionId, KIND, {});
+          else return false;
+        }
+        if (onScreen === sessionId) {
+          if (typeof sidebar.isExpanded === "function" && !sidebar.isExpanded()) sidebar.toggleExpanded?.();
+          const tab = (typeof sidebar.tabsIn === "function" ? sidebar.tabsIn(sessionId) : []).find((t) => t.kind === KIND);
+          if (tab) sidebar.focus?.(tab.id);
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    /** Open the Browser tab when a browser starts or asks for help (not for ones already open at page load). */
+    function autoOpenOnActivity(ctx, directory) {
+      const helped = new Set();
+      return directory.onChange((browsers, previous, first) => {
+        const before = new Set(previous.map((b) => b.key));
+        for (const b of browsers) {
+          if (first) {
+            if (b.help) helped.add(b.key);
+            continue;
+          }
+          if (!before.has(b.key)) revealBrowserTab(ctx, b.key);
+          if (b.help && !helped.has(b.key)) {
+            helped.add(b.key);
+            revealBrowserTab(ctx, b.key);
+          } else if (!b.help) helped.delete(b.key);
+        }
+      });
+    }
+
+    const DOCK_CSS = `
+.cbd-dock{box-sizing:border-box;width:calc(100% - var(--dsh-composer-side-clearance,0px)*2 - var(--dsh-composer-dock-inset,8px)*4);margin:0 auto}
+.cbd-bar{isolation:isolate;box-sizing:border-box;width:100%;max-width:calc(var(--dsh-composer-card-max-width,760px) - 4 * var(--dsh-composer-dock-inset,8px));--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);min-height:36px;box-shadow:var(--dsw-elevation-panel);border:0;align-items:center;gap:10px;margin:0 auto;padding:4px 5px 4px 12px;display:flex;position:relative;cursor:pointer;text-align:left;font:inherit;color:inherit;background:none}
+.cbd-bar:before{z-index:-1;border-radius:inherit;background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1));backdrop-filter:var(--dsw-menu-backdrop-filter);content:"";pointer-events:none;position:absolute;inset:0}
+.cbd-bar:hover:before{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}
+.cbd-bar:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.cbd-glyph{color:var(--dsw-alias-label-tertiary);flex:none;display:inline-flex;position:relative}
+.cbd-pulse{position:absolute;right:-2px;bottom:-1px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 2px var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1))}
+.cbd-human .cbd-pulse{background:var(--dsw-alias-state-warn-primary)}
+.cbd-label{color:var(--dsw-alias-label-primary);flex:none;font-size:13px;font-weight:500;line-height:24px}
+.cbd-detail{min-width:0;color:var(--dsw-alias-label-primary-dimmed,var(--dsw-alias-label-secondary));text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;line-height:20px;overflow:hidden}
+.cbd-help .cbd-detail{color:var(--dsw-alias-state-warn-label,var(--dsw-alias-state-warn-primary))}
+.cbd-open{flex:none;font-size:12px;color:var(--dsw-alias-label-tertiary);padding:0 8px;line-height:28px;border-radius:999px}
+.cbd-bar:hover .cbd-open{color:var(--dsw-alias-label-secondary)}
+`;
+
+    function hostOf(url) {
+      try { return new URL(url).host || url; } catch { return url || ""; }
+    }
+
+    /** Fixed bar above the composer while this conversation's browser runs; click opens its sidebar tab. */
+    function BrowserDock({ sessionId, directory, reveal, t }) {
+      const [entry, setEntry] = useState(() => directory.get(sessionId));
+      useEffect(() => {
+        setEntry(directory.get(sessionId));
+        return directory.subscribe(() => setEntry(directory.get(sessionId)));
+      }, [sessionId]);
+      if (!entry) return null;
+      const human = entry.control === "human";
+      const status = entry.help ? t("dock.help") : human ? t("dock.human") : t("dock.agent");
+      const where = entry.title || hostOf(entry.url) || t("dock.blank");
+      return h("div", { className: "cbd-dock" },
+        h("style", null, DOCK_CSS),
+        h("button", {
+          type: "button",
+          className: `cbd-bar ${human ? "cbd-human" : ""} ${entry.help ? "cbd-help" : ""}`,
+          title: entry.url || "",
+          "aria-label": `${t("dock.label")}: ${status}. ${t("dock.open")}`,
+          onClick: () => reveal(sessionId)
+        },
+          h("span", { className: "cbd-glyph" }, h(Icon, { size: 16 }), h("span", { className: "cbd-pulse" })),
+          h("span", { className: "cbd-label" }, t("dock.label")),
+          h("span", { className: "cbd-detail" }, entry.help ? `${status} — ${entry.help}` : `${status} · ${where}${entry.tabs > 1 ? ` · ${t("dock.tabs", { n: String(entry.tabs) })}` : ""}`),
+          h("span", { className: "cbd-open" }, t("dock.open"))));
     }
 
     // BEGIN settings.js (generated by scripts/build-client.mjs)
@@ -691,7 +783,8 @@ window.__ModuleLoader__.load({
 .cbs-input[aria-invalid=true],.cbs-text[aria-invalid=true]{border-color:var(--dsw-alias-state-error-primary)}
 .cbs-switch{position:relative;width:36px;height:20px;border-radius:999px;border:0;cursor:pointer;background:var(--dsw-alias-border-l2);flex:none;padding:0}
 .cbs-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary)}
-.cbs-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .12s}
+.cbs-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-bg-base);transition:left .12s}
+.cbs-switch[aria-checked=true]{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary))}
 .cbs-switch[aria-checked=true]::after{left:18px}
 .cbs-switch:disabled{opacity:.5;cursor:default}
 .cbs-link{appearance:none;border:0;background:none;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:0 2px;text-decoration:underline}
@@ -699,7 +792,8 @@ window.__ModuleLoader__.load({
 .cbs-bar .cbs-status{margin-right:auto;color:var(--dsw-alias-label-secondary);font-size:12px}
 .cbs-bar .cbs-status.cbs-bad{color:var(--dsw-alias-state-error-primary)}
 .cbs-btn{appearance:none;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 14px;font:inherit;cursor:pointer}
-.cbs-btn.cbs-primary{background:var(--dsw-alias-brand-primary);border-color:transparent;color:#fff}
+.cbs-btn.cbs-primary{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary));border-color:transparent;color:var(--dsw-alias-label-primary-foreground,var(--dsw-alias-bg-base))}
+.cbs-btn.cbs-primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-button-primary-fill))}
 .cbs-btn:disabled{opacity:.45;cursor:default}
 .cbs-note{border-left:3px solid var(--dsw-alias-brand-primary);padding:8px 12px;background:var(--dsw-alias-bg-layer-1);border-radius:6px;color:var(--dsw-alias-label-secondary);line-height:1.5}
 .cbs-note b{color:var(--dsw-alias-label-primary)}
@@ -869,7 +963,18 @@ window.__ModuleLoader__.load({
           key: TYPE_ID,
           locale: NS
         }, Body)), "cloak-browser.body");
-        ctx.effect(() => watchAgentBrowsers(ctx), "cloak-browser.watch");
+        const directory = createBrowserDirectory();
+        ctx.effect(() => () => directory.dispose(), "cloak-browser.directory");
+        ctx.effect(() => autoOpenOnActivity(ctx, directory), "cloak-browser.auto-open");
+        // "Browser running" bar above the composer, like the goal/todo docks.
+        const reveal = (sessionId) => revealBrowserTab(ctx, sessionId);
+        ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({
+          name: "conversation.input.dock",
+          id: "cloak-browser",
+          order: 5,
+          label: () => t("dock.label"),
+          locale: NS
+        }, (props) => h(BrowserDock, { sessionId: props.sessionId, directory, reveal, t }))), "cloak-browser.dock");
       }
     };
   }

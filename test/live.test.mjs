@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { registerLiveRoutes, ROUTE_BASE } from "../lib/live.mjs";
+import { browserDirectory, registerLiveRoutes, ROUTE_BASE } from "../lib/live.mjs";
+
+test("browser directory rows carry what the composer dock shows", async () => {
+  const page = { url: () => "https://assetstore.unity.com/account/assets", title: async () => "My Assets", isClosed: () => false };
+  const session = { activePage: page, livePages: () => [page, page], control: { holder: "human" }, helpRequest: { reason: "log in" }, lastAction: { label: "open" } };
+  const rows = await browserDirectory({ list: () => [{ key: "session-a", session }] });
+  assert.deepEqual(rows, [{ key: "session-a", control: "human", help: "log in", url: "https://assetstore.unity.com/account/assets", title: "My Assets", tabs: 2, lastAction: "open" }]);
+});
 
 // Same longest-prefix rule as @deepseek-ai/dsh-host-webserver `match()`.
 function matches(prefix, pathname) {

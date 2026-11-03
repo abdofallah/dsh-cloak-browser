@@ -133,8 +133,19 @@ test("human control blocks mutating agent calls but not reads", async () => {
 test("subagents resolve to their root session's browser", () => {
   const agents = new Map([["root", { id: "root", session: { header: {} } }]]);
   const resolve = browserKeyResolver({ get: (name) => (name === "agents" ? { get: (id) => agents.get(id) } : undefined) }, normalizeConfig({}));
-  assert.equal(resolve({ agent: { id: "child", session: { header: { parentSession: "root" } } } }), "root");
+  const sub = { parentSession: "root", origin: "subagent", delegationDepth: 1 };
+  assert.equal(resolve({ agent: { id: "child", session: { header: sub } } }), "root");
   assert.equal(resolve({ agent: { id: "root", session: { header: {} } } }), "root");
   const isolated = browserKeyResolver({ get: () => undefined }, normalizeConfig({ subagentsShareBrowser: false }));
-  assert.equal(isolated({ agent: { id: "child", session: { header: { parentSession: "root" } } } }), "child");
+  assert.equal(isolated({ agent: { id: "child", session: { header: sub } } }), "child");
+});
+
+test("a forked or resumed conversation keeps its own browser (it has its own sidebar)", () => {
+  const agents = new Map([["original", { id: "original", session: { header: {} } }]]);
+  const resolve = browserKeyResolver({ get: (name) => (name === "agents" ? { get: (id) => agents.get(id) } : undefined) }, normalizeConfig({}));
+  const fork = { parentSession: "original", isSeeded: true, delegationDepth: 0 };
+  assert.equal(resolve({ agent: { id: "forked", session: { header: fork } } }), "forked");
+  // Parent gone (e.g. the original chat was closed): still its own key, never the dead parent's.
+  agents.clear();
+  assert.equal(resolve({ agent: { id: "forked", session: { header: fork } } }), "forked");
 });
