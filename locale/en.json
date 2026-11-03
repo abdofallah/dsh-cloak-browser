@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloak Browser",
+    "description": "The Harness browser: stealth CloakBrowser (Chromium) tools for the agent, with a live Browser tab in the right sidebar where you watch, take over, and hand back control."
+  }
+}

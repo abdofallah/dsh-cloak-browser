@@ -1,33 +1,27 @@
-# Thin native integration: DSH tools call CloakBrowser through a per-Agent session map.
-# Secrets are intentionally absent. CloakBrowser reads CLOAKBROWSER_LICENSE_KEY itself;
-# proxy credentials are read from the environment named by proxyEnv.
+# CloakBrowser as the Harness browser: browser_* tools for every session, the exclusive
+# browser-use slot, and (through the package's dsh.client half) the right-sidebar Browser
+# tab with live view and take-over, which replaces the built-in iframe/webview browser tab.
+# Secrets are intentionally absent: CloakBrowser reads CLOAKBROWSER_LICENSE_KEY (or
+# ~/.cloakbrowser/license.key); a proxy URL is read from the variable named by proxyEnv.
+# Override any value from the profile's cordis.patch.yml with `- id: cloak-browser`.
 - insert:
     - id: cloak-browser
       name: 'dsh-cloak-browser'
       config:
         headless: true
-        humanize: true
-        humanPreset: default
-        geoip: auto
+        humanize: false
+        profileMode: per-session
+        subagentsShareBrowser: true
+        maxSessions: 5
+        idleCloseMinutes: 30
+        legacyBinaryFallback: true
         proxyEnv: CLOAKBROWSER_PROXY_URL
-        persistentProfileRoot: ''
-        fingerprintSeed: ''
-        fingerprintNoise: false
-        fingerprintWindowsFontMetrics: false
-        allowThirdPartyCookies: false
-        fingerprintStorageQuotaMb: 0
-        viewportWidth: 0
-        viewportHeight: 0
-        allowedDomains: []
-        blockedDomains: []
-        blockPrivateNetworks: true
-        maxPages: 5
-        actionTimeoutMs: 15000
-        typingTimeoutMs: 90000
-        navigationTimeoutMs: 30000
-        maxSnapshotElements: 100
-        maxTextChars: 12000
+        proxyFailClosed: true
+        geoip: auto
+        blockPrivateNetworks: false
+        allowEvaluate: true
         autoSnapshot: true
-        screenshotFormat: jpeg
-        screenshotQuality: 80
+        liveView: true
+        inputTakesControl: true
+        claimBrowserUse: true
         routePrompt: true

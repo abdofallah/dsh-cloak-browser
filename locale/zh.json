@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloak 浏览器",
+    "description": "Harness 的内置浏览器：为 Agent 提供隐身 CloakBrowser（Chromium）工具，并在右侧栏浏览器标签中实时观看、接管与交还控制。"
+  }
+}

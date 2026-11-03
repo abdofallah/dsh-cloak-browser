@@ -1,73 +1,77 @@
 {
   "name": "dsh-cloak-browser",
-  "version": "0.3.0",
-  "description": "Native CloakBrowser tools for DeepSeek Harness with per-agent browser sessions and snapshot references.",
-  "author": "maxiaovivi",
+  "version": "1.0.0",
+  "description": "CloakBrowser as DeepSeek Harness's one browser: stealth Chromium browser_* tools for the agent, plus a live, controllable Browser tab in the right sidebar.",
+  "author": "abdofallah (fork of maxiaovivi/dsh-cloak-browser)",
   "type": "module",
   "main": "./lib/plugin.mjs",
   "exports": {
     ".": "./lib/plugin.mjs",
+    "./client": "./client.js",
     "./policy": "./lib/policy.mjs",
-    "./snapshot": "./lib/snapshot.mjs"
+    "./snapshot": "./lib/snapshot.mjs",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
   },
+  "icon": "./icon.svg",
   "files": [
     "lib",
-    "bench",
-    "stealth/*.mjs",
+    "client.js",
+    "locale/*.json",
+    "icon.svg",
     "docs",
-    "assets/screenshots",
     "cordis.patch.yml",
     "README.md",
-    "README.zh-CN.md",
     "LICENSE"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/maxiaovivi/dsh-cloak-browser.git"
+    "url": "git+https://github.com/abdofallah/dsh-cloak-browser.git"
   },
-  "homepage": "https://github.com/maxiaovivi/dsh-cloak-browser#readme",
+  "homepage": "https://github.com/abdofallah/dsh-cloak-browser#readme",
   "bugs": {
-    "url": "https://github.com/maxiaovivi/dsh-cloak-browser/issues"
+    "url": "https://github.com/abdofallah/dsh-cloak-browser/issues"
   },
   "keywords": [
     "deepseek-harness",
     "dsh",
+    "dsh-plugin",
     "cloakbrowser",
     "playwright",
     "browser-automation",
     "ai-agent"
   ],
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test --test-isolation=none test/*.test.mjs",
     "test:integration": "node --test test/*.integration.mjs",
-    "test:stealth": "node stealth/run.mjs",
-    "test:stealth:local": "node stealth/run.mjs --suite local",
-    "benchmark": "node bench/benchmark.mjs",
-    "benchmark:json": "node bench/benchmark.mjs --json",
-    "benchmark:no-humanize": "node bench/benchmark.mjs --no-humanize",
-    "check": "node --check lib/plugin.mjs && node --check lib/policy.mjs && node --check lib/snapshot.mjs && node --check bench/benchmark.mjs && node --check stealth/detectors.mjs && node --check stealth/run.mjs"
+    "test:smoke": "node test/smoke.local.mjs",
+    "check": "node --check lib/plugin.mjs && node --check lib/tools.mjs && node --check lib/session.mjs && node --check lib/manager.mjs && node --check lib/live.mjs && node --check lib/launch.mjs && node --check lib/policy.mjs && node --check lib/snapshot.mjs && node --check client.js"
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.2 || >=0.2.1-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 || >=0.2.1-0",
+    "@deepseek-ai/schemastery": "^3.18.1"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.17.4",
-    "cloakbrowser": "0.5.7",
+    "cloakbrowser": "^0.7.0",
     "mmdb-lib": "^3.0.2",
-    "playwright-core": "1.62.0"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh-llm": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-tools": "0.1.0-rc.6"
+    "playwright-core": "^1.64.1"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "license": "MIT"
 }
