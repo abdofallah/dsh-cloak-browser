@@ -18,6 +18,8 @@
   "files": [
     "lib",
     "client.js",
+    "settings.js",
+    "scripts",
     "locale/*.json",
     "icon.svg",
     "docs",
@@ -43,10 +45,11 @@
     "ai-agent"
   ],
   "scripts": {
+    "build": "node scripts/build-client.mjs",
     "test": "node --test --test-isolation=none test/*.test.mjs",
     "test:integration": "node --test test/*.integration.mjs",
     "test:smoke": "node test/smoke.local.mjs",
-    "check": "node --check lib/plugin.mjs && node --check lib/tools.mjs && node --check lib/session.mjs && node --check lib/manager.mjs && node --check lib/live.mjs && node --check lib/launch.mjs && node --check lib/policy.mjs && node --check lib/snapshot.mjs && node --check client.js"
+    "check": "node scripts/build-client.mjs && node --check lib/plugin.mjs && node --check lib/tools.mjs && node --check lib/session.mjs && node --check lib/manager.mjs && node --check lib/live.mjs && node --check lib/launch.mjs && node --check lib/policy.mjs && node --check lib/snapshot.mjs && node --check settings.js && node --check client.js"
   },
   "dsh": {
     "bundle": {
